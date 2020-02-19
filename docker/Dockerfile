@@ -1,4 +1,4 @@
-FROM continuumio/anaconda3:2019.03
+FROM continuumio/miniconda3:latest
 
 RUN apt-get update && apt-get upgrade -y \
     && apt-get install -y \
@@ -6,32 +6,16 @@ RUN apt-get update && apt-get upgrade -y \
         build-essential \
         git \
         sudo \
-        cmake zlib1g-dev libjpeg-dev xvfb libav-tools xorg-dev libboost-all-dev libsdl2-dev swig \
+        cmake zlib1g-dev libjpeg-dev xvfb ffmpeg xorg-dev libboost-all-dev libsdl2-dev swig \
         unzip zip \
     && rm -rf /var/lib/apt/lists/*
 
-RUN conda update -n base conda
-RUN conda install -y \
-        joblib \
-        PyYAML==3.13
-RUN conda install -y -c conda-forge \
-        pyopengl \
-        xgboost \
-        nbdime
-RUN pip install "urlextract"
-RUN pip install "gym[atari,box2d,classic_control]"
-RUN pip install "tensorflow-hub"
-RUN pip install "tensorflow-serving-api"
-RUN pip install "tfx"
-#RUN pip install "tensorflow-addons"
-RUN pip install "tf-agents-nightly"
-RUN pip install "tfds-nightly"
-RUN pip install "tfp-nightly"
-RUN pip uninstall -y tensorflow
-RUN pip uninstall -y tensorboard
-RUN pip install "tf-nightly-2.0-preview"
-RUN pip install "tb-nightly"
-
+COPY environment.yml /tmp/
+RUN conda update -y -n base conda \
+    && echo '    - pyvirtualdisplay' >> /tmp/environment.yml \
+    && conda env create -f /tmp/environment.yml \
+    && conda clean -y -t \
+    && rm /tmp/environment.yml
 
 ARG username
 ARG userid
@@ -48,6 +32,8 @@ RUN chown ${username}:${username} ${workdir}
 
 USER ${username}
 WORKDIR ${workdir}
+
+ENV PATH /opt/conda/envs/tf2/bin:$PATH
 
 # The config below enables diffing notebooks with nbdiff (and nbdiff support
 # in git diff command) after connecting to the container by "make exec" (or
@@ -66,9 +52,9 @@ RUN git config --global diff.jupyternotebook.command 'git-nbdiffdriver diff --ig
 
 
 COPY docker/bashrc.bash /tmp/
-RUN cat /tmp/bashrc.bash >> ${home}/.bashrc
-RUN echo "export PATH=\"${workdir}/docker/bin:$PATH\"" >> ${home}/.bashrc
-RUN sudo rm /tmp/bashrc.bash
+RUN cat /tmp/bashrc.bash >> ${home}/.bashrc \
+    && echo "export PATH=\"${workdir}/docker/bin:$PATH\"" >> ${home}/.bashrc \
+    && sudo rm /tmp/bashrc.bash
 
 
 # INFO: Uncomment lines below to enable automatic save of python-only and html-only
